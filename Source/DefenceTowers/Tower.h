@@ -12,7 +12,7 @@ struct FWindows
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Shooting Windows")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (MakeEditWidget = "true"), Category = "Shooting Windows")
 	TArray<FVector> DefaultWindowSlots;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Shooting Windows")
 	TArray<FVector> UnitWindowSlots;
@@ -46,7 +46,7 @@ public:
 
 	FTimerHandle AttackTimerHandle;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Shooting Windows")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Shooting Windows")
 	bool bCanFire;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Mesh")

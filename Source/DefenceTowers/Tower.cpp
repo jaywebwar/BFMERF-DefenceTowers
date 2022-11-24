@@ -6,6 +6,7 @@
 #include "DefenceTowersCharacter.h"
 #include "TimerManager.h"
 #include "DrawDebugHelpers.h"
+#include "Containers/Array.h"
 
 // Sets default values
 ATower::ATower()
@@ -18,7 +19,7 @@ ATower::ATower()
 	RangeSphere = CreateDefaultSubobject<USphereComponent>(TEXT("RangeSphere"));
 
 	Mesh->SetupAttachment(GetRootComponent());
-	RangeSphere->SetupAttachment(GetRootComponent());
+	RangeSphere->SetupAttachment(Mesh);
 	
 	
 	AttackRate = 1.f;
@@ -34,7 +35,7 @@ void ATower::BeginPlay()
 	Super::BeginPlay();
 
 	Mesh->SetupAttachment(GetRootComponent());
-	RangeSphere->SetupAttachment(GetRootComponent());
+	RangeSphere->SetupAttachment(Mesh);
 	
 	RangeSphere->OnComponentBeginOverlap.AddDynamic(this, &ATower::OnOverlapBegin);
 	RangeSphere->OnComponentEndOverlap.AddDynamic(this, &ATower::OnOverlapEnd);
@@ -50,8 +51,13 @@ void ATower::Tick(float DeltaTime)
 
 void ATower::Fire()
 {
+	UE_LOG(LogTemp, Warning, TEXT("Number of Enemies in range = %u"), EnemiesInRange.Num());
 	//Attack
-	DrawDebugLine(GetWorld(), ShootingWindows.DefaultWindowSlots[0], EnemiesInRange[0]->GetActorLocation(), FColor::Blue, false, .25f);
+	if (ShootingWindows.DefaultWindowSlots.Num() > 0)
+	{
+		DrawDebugLine(GetWorld(), ShootingWindows.DefaultWindowSlots.Last(0), EnemiesInRange.Last(0)->GetActorLocation(), FColor::Blue, false, .25f);
+	}
+		
 
 	//Stop continuous attacks
 	bCanFire = false;
@@ -86,9 +92,12 @@ void ATower::OnOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* Othe
 {
 	if (OtherActor)
 	{
-		if (EnemiesInRange.Find(OtherActor) != INDEX_NONE)
+		if (EnemiesInRange.Num() > 0)
 		{
-			EnemiesInRange.Remove(OtherActor);
+			if (EnemiesInRange.Find(OtherActor) != INDEX_NONE)
+			{
+				EnemiesInRange.Remove(OtherActor);
+			}
 		}
 	}
 }
