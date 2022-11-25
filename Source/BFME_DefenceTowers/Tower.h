@@ -13,7 +13,7 @@ struct FWindows
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (MakeEditWidget = "true"), Category = "Shooting Windows")
 	TArray<FVector> DefaultWindowSlots;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Shooting Windows")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (MakeEditWidget = "true"), Category = "Shooting Windows")
 	TArray<FVector> UnitWindowSlots;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Shooting Windows")
@@ -51,6 +51,16 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Mesh")
 	UStaticMeshComponent* Mesh;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Shooting Windows")
+	class UBoxComponent* GarrisonBox;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Shooting Windows")
+	TMap<FVector, bool> UnitWindowOccupationMap;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Team")
+	int32 TeamNumber;
+
+
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -66,8 +76,20 @@ public:
 	void ReloadAttack();
 
 	UFUNCTION()
-	void OnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+	void OnEnterRange(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 
 	UFUNCTION()
-	void OnOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
+	void OnExitRange(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
+
+	UFUNCTION()
+	void OnEnterGarrison(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+
+	UFUNCTION()
+	void OnExitGarrison(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
+
+	UFUNCTION()
+	bool ThereIsAnAvailableUnitWindow();
+
+	UFUNCTION()
+	FVector GetAvailableUnitWindow();
 };

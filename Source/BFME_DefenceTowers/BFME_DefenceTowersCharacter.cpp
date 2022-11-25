@@ -43,9 +43,16 @@ ABFME_DefenceTowersCharacter::ABFME_DefenceTowersCharacter()
 	// Activate ticking in order to update the cursor every frame.
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.bStartWithTickEnabled = true;
+
+	TeamNumber = 1;
 }
 
 void ABFME_DefenceTowersCharacter::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
+}
+
+int32 ABFME_DefenceTowersCharacter::GetTeam() const
+{
+	return TeamNumber;
 }

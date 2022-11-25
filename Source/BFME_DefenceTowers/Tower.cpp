@@ -3,10 +3,13 @@
 
 #include "Tower.h"
 #include "Components/SphereComponent.h"
+#include "Components/BoxComponent.h"
 #include "BFME_DefenceTowersCharacter.h"
 #include "TimerManager.h"
 #include "DrawDebugHelpers.h"
 #include "Containers/Array.h"
+#include "Containers/Map.h"
+#include "Kismet/KismetSystemLibrary.h"
 
 // Sets default values
 ATower::ATower()
@@ -21,21 +24,61 @@ ATower::ATower()
 	Mesh->SetupAttachment(GetRootComponent());
 	RangeSphere->SetupAttachment(Mesh);
 
+	GarrisonBox = CreateDefaultSubobject<UBoxComponent>(TEXT("GarrisonBox"));
+	GarrisonBox->SetupAttachment(Mesh);
+
 
 	AttackRate = 1.f;
 
 	bCanFire = true;
 
 	RangeSphere->InitSphereRadius(ShootingWindows.AttackRange);
+
+	TeamNumber = 1;
+
+	
 }
 
 // Called when the game starts or when spawned
 void ATower::BeginPlay()
 {
 	Super::BeginPlay();
+
+	TArray<TEnumAsByte<EObjectTypeQuery>> TypeFilter;
+	UClass* ClassFilter = AActor::StaticClass();
+	TArray<AActor*> IgnoreActors;
+	IgnoreActors.Init(this, 1);
+	TArray<AActor*> OutActors;
+	UKismetSystemLibrary::SphereOverlapActors(this, RangeSphere->GetComponentLocation(), ShootingWindows.AttackRange, TypeFilter, ClassFilter, IgnoreActors, OutActors);
+	for (auto actor : OutActors)
+	{
+		if (IsValid(actor))
+		{
+			ATower* tower = Cast<ATower>(actor);
+			if (IsValid(tower))
+			{
+				EnemiesInRange.Add(actor);
+			}
+
+			ABFME_DefenceTowersCharacter* character = Cast<ABFME_DefenceTowersCharacter>(actor);
+			if (IsValid(character))
+			{
+				if (character->GetTeam() != TeamNumber)
+					EnemiesInRange.Add(actor);
+			}
+		}
+	}
 	
-	RangeSphere->OnComponentBeginOverlap.AddDynamic(this, &ATower::OnOverlapBegin);
-	RangeSphere->OnComponentEndOverlap.AddDynamic(this, &ATower::OnOverlapEnd);
+	RangeSphere->OnComponentBeginOverlap.AddDynamic(this, &ATower::OnEnterRange);
+	RangeSphere->OnComponentEndOverlap.AddDynamic(this, &ATower::OnExitRange);
+
+	GarrisonBox->OnComponentBeginOverlap.AddDynamic(this, &ATower::OnEnterGarrison);
+	GarrisonBox->OnComponentEndOverlap.AddDynamic(this, &ATower::OnExitGarrison);
+
+	for (auto unitWindow : ShootingWindows.UnitWindowSlots)
+	{
+		UnitWindowOccupationMap.Add(unitWindow, false);
+	}
 }
 
 // Called every frame
@@ -49,12 +92,20 @@ void ATower::Tick(float DeltaTime)
 
 void ATower::Fire()
 {
-	UE_LOG(LogTemp, Warning, TEXT("Number of Enemies in range = %u"), EnemiesInRange.Num());
 	//Attack
-	if (ShootingWindows.DefaultWindowSlots.Num() > 0)
+	for (auto slotLocation : ShootingWindows.DefaultWindowSlots)
 	{
-		auto WindowLocation = GetActorLocation() + ShootingWindows.DefaultWindowSlots[0];
+		auto WindowLocation = GetActorLocation() + slotLocation;
 		DrawDebugLine(GetWorld(), WindowLocation, EnemiesInRange[0]->GetActorLocation(), FColor::Blue, false, .25f);
+	}
+
+	for (auto slotLocation : ShootingWindows.UnitWindowSlots)
+	{
+		if (UnitWindowOccupationMap[slotLocation])
+		{
+			auto WindowLocation = GetActorLocation() + slotLocation;
+			DrawDebugLine(GetWorld(), WindowLocation, EnemiesInRange[0]->GetActorLocation(), FColor::Red, false, .25f);
+		}
 	}
 
 	//Stop continuous attacks
@@ -68,7 +119,7 @@ void ATower::ReloadAttack()
 	bCanFire = true;
 }
 
-void ATower::OnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+void ATower::OnEnterRange(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
 	if (IsValid(OtherActor))
 	{
@@ -81,12 +132,13 @@ void ATower::OnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* Ot
 		ABFME_DefenceTowersCharacter* character = Cast<ABFME_DefenceTowersCharacter>(OtherActor);
 		if (IsValid(character))
 		{
-			EnemiesInRange.Add(OtherActor);
+			if(character->GetTeam() != TeamNumber)
+				EnemiesInRange.Add(OtherActor);
 		}
 	}
 }
 
-void ATower::OnOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
+void ATower::OnExitRange(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
 {
 	if (IsValid(OtherActor))
 	{
@@ -98,4 +150,45 @@ void ATower::OnOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* Othe
 			}
 		}
 	}
+}
+
+void ATower::OnEnterGarrison(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+	if (IsValid(OtherActor))
+	{
+		ABFME_DefenceTowersCharacter* character = Cast<ABFME_DefenceTowersCharacter>(OtherActor);
+		if (IsValid(character))
+		{
+			if (character->GetTeam() == TeamNumber && ThereIsAnAvailableUnitWindow())
+			{
+				character->SetActorHiddenInGame(true);
+				UnitWindowOccupationMap[GetAvailableUnitWindow()] = true;
+			}
+		}
+	}
+}
+
+void ATower::OnExitGarrison(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
+{
+
+}
+
+bool ATower::ThereIsAnAvailableUnitWindow()
+{
+	for (auto window : ShootingWindows.UnitWindowSlots)
+	{
+		if (!UnitWindowOccupationMap[window])
+			return true;
+	}
+	return false;
+}
+
+FVector ATower::GetAvailableUnitWindow()
+{
+	for (auto window : ShootingWindows.UnitWindowSlots)
+	{
+		if (!UnitWindowOccupationMap[window])
+			return window;
+	}
+	return FVector(0.f); //Should never reach here if ThereIsAnAvailableUnitWindow() is called before this function.
 }
