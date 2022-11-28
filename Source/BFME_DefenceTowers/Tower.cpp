@@ -92,12 +92,31 @@ void ATower::Tick(float DeltaTime)
 
 void ATower::Fire()
 {
+	UE_LOG(LogTemp, Warning, TEXT("Enemies in Range Num = %u"), EnemiesInRange.Num())
+
 	//Attack
-	for (auto slotLocation : ShootingWindows.DefaultWindowSlots)
+
+	//Acquire target prioritizing units
+	AActor* target = AcquireTarget();
+	
+	//Select appropriate shooting window
+	FVector shootingLocation = FVector(0.f);//assumes the world location of a window will never be (0, 0, 0).
+	for (auto relativeLocation : ShootingWindows.DefaultWindowSlots)
 	{
-		auto WindowLocation = GetActorLocation() + slotLocation;
-		DrawDebugLine(GetWorld(), WindowLocation, EnemiesInRange[0]->GetActorLocation(), FColor::Blue, false, .25f);
+		auto WindowLocation = GetActorLocation() + relativeLocation;
+		if (shootingLocation == FVector(0.f))
+		{
+			shootingLocation = WindowLocation;
+		}
+		else
+		{
+			float currentDistance = FVector::Distance(shootingLocation, target->GetActorLocation());
+			float checkingDistance = FVector::Distance(WindowLocation, target->GetActorLocation());
+			shootingLocation = checkingDistance < currentDistance ? WindowLocation : shootingLocation;
+		}
 	}
+	if(ShootingWindows.DefaultWindowSlots.Num() != 0)
+		DrawDebugLine(GetWorld(), shootingLocation, target->GetActorLocation(), FColor::Blue, false, .25f);
 
 	for (auto slotLocation : ShootingWindows.UnitWindowSlots)
 	{
@@ -191,4 +210,18 @@ FVector ATower::GetAvailableUnitWindow()
 			return window;
 	}
 	return FVector(0.f); //Should never reach here if ThereIsAnAvailableUnitWindow() is called before this function.
+}
+
+AActor* ATower::AcquireTarget()
+{
+	for (int i=0; i<EnemiesInRange.Num(); i++)
+	{
+		ABFME_DefenceTowersCharacter* character = Cast<ABFME_DefenceTowersCharacter>(EnemiesInRange[i]);
+		if (IsValid(character))
+			return EnemiesInRange[i];//first enemy unit that was found
+		if (i == EnemiesInRange.Num() - 1)
+			return EnemiesInRange[0];//first enemy (building/non-unit) that was found
+	}
+	UE_LOG(LogTemp, Warning, TEXT("Should not happen"));
+	return nullptr;
 }

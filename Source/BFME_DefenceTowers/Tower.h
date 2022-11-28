@@ -92,4 +92,7 @@ public:
 
 	UFUNCTION()
 	FVector GetAvailableUnitWindow();
+
+	UFUNCTION()
+	AActor* AcquireTarget();
 };
